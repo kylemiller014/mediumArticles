@@ -18,4 +18,4 @@ echo "Installing required packages (streamlit + fpdf)..."
 pip install streamlit fpdf
 
 echo "All set! Launching Streamlit app..."
-python3 -m streamlit run streamlit_app.py
+python3 -m streamlit run ./pythonPDFcreate/recipeToPDF.py
