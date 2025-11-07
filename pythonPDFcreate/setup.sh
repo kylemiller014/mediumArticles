@@ -1,21 +1,38 @@
 #!/bin/bash
+# Failsafe setup for Streamlit recipe PDF app
+# Creates venv in pythonPDFcreate folder and runs everything inside it
 
-# --- One-Shot Setup Script for Mac ---
+set -e  # Stop on first error
 
-# Stop on error
-set -e
+VENV_DIR="pythonPDFcreate"
 
-echo "Creating virtual environment 'venv'..."
-python3 -m venv venv
+# Check for Python3
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Python3 not found. Please install Python3."
+    exit 1
+fi
 
-echo "Activating virtual environment..."
-source venv/bin/activate
+# Create virtual environment if missing
+if [ ! -d "$VENV_DIR" ]; then
+    echo "🔹 Creating virtual environment in '$VENV_DIR'..."
+    python3 -m venv "$VENV_DIR"
+else
+    echo "🔹 Virtual environment '$VENV_DIR' already exists. Skipping creation."
+fi
 
-echo "Upgrading pip..."
-pip install --upgrade pip
+# Upgrade pip inside venv
+echo "🔹 Upgrading pip..."
+./$VENV_DIR/venv/bin/pip install --upgrade pip
 
-echo "Installing required packages (streamlit + fpdf)..."
-pip install streamlit fpdf
+# Install required packages
+echo "🔹 Installing required packages (streamlit + fpdf)..."
+./$VENV_DIR/venv/bin/pip install streamlit fpdf
 
-echo "All set! Launching Streamlit app..."
-python3 -m streamlit run ./pythonPDFcreate/recipeToPDF.py
+# Run Streamlit app
+if [ -f "recipeToPDF.py" ]; then
+    echo "🔹 Launching Streamlit app..."
+    ./$VENV_DIR/venv/bin/python -m streamlit run ./recipeToPDF.py
+else
+    echo "❌ recipeToPDF.py not found in project folder."
+    exit 1
+fi
