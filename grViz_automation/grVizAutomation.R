@@ -5,6 +5,7 @@ require(DiagrammeR)
 require(htmlwidgets)
 require(DiagrammeRsvg)
 require(rsvg)
+require(stringr)
 
 #### Background/Introduction ####
 # Simple example of grViz functionality
@@ -38,6 +39,10 @@ csvToGrViz <- function(inputFile, # .CSV file required
   # rsvg
   if(!requireNamespace("rsvg", quietly = TRUE)) {
     stop("Install the rsvg package - install.packages('rsvg')", call. = FALSE)
+  }
+  # stringr
+  if(!requireNamespace("stringr", quietly = TRUE)) {
+    stop("Install the stringr package - install.packages('stringr')", call. = FALSE)
   }
   #### Initial data validation check for user inputs ####
   # Check the "inputFile" path provided by the user
@@ -103,4 +108,143 @@ csvToGrViz <- function(inputFile, # .CSV file required
     print("Rank seperation value either missing or is not a numeric value between 0.02 and 5.0")
     print("Setting rankSep to the default value - 0.5")
   }
+  
+  # Following input validation checks - read in .CSV file
+  # Read in .csv 
+  df <- read.csv(paste0(dir, inputFile))
+  
+  # Get a list of column data types to ensure only string values provided
+  colDataTypes <- list(sapply(df, class))
+  
+  # Check column count
+  if(ncol(df) != 6){
+    stop("CSV file did not have the correct number of columns... 
+         Check file provided and try again", call. = FALSE)
+  
+    # Determine if any columns contain non-string values
+  } else if(length(unique(colDataTypes)) != 1){
+    stop("CSV file contained columns with data types other than string... 
+         Check file provided and try again", call. = FALSE)
+    
+    # Standardized column naming conventions
+    # Print the df to the console for user / debugging purposes...
+  } else {
+    print("Standardizing column names...")
+    colnames(df) <- c("Name", "Description", "Color", "NodeShape", "From", "To")
+    print(df)
+  }
+  
+  # Specific column handling
+  # Name - remove spaces or any weird characters
+  df$Name <- str_replace_all(df$Name, " ", "")
+  df$Name <- str_replace_all(df$Name, "[^[:alnum:]]", "")
+  
+  # Get a list of unique node names
+  uniqueNodeNames <- unique(df$Name)
+  print(paste0("Number of user defined nodes: ",length(uniqueNodeNames)))
+  
+  # Color - Determine the unique colors provided by the user
+  # Check if any of the colors do not exist / are not valid
+  # If yes - replace with standard color and warn user
+  # List of all available colors for use
+  validColors <- colors()
+  userProvidedColors <- df$Colors
+  
+  # Determine if user provided colors are valid
+  colorCheck <- tolower(userProvidedColors) %in% tolower(validColors)
+  
+  if(all(colorCheck)){
+    print("All user provided node colors are valid...")
+  } else{
+    # Replace nonstandard colors with "gray90" and warn user
+    userProvidedColors[!colorCheck] <- "gray90"
+    print("One or more invalid colors provided in 'Color' column...
+          Replacing invalid colors with 'gray90'...")
+  }
+  
+  # NodeShape - limit the shapes available to the following:
+  validNodeShapes <- c(
+    "box","polygon","ellipse","oval","circle","point","egg","triangle",
+    "plaintext","plain","diamond","trapezium","parallelogram","house",
+    "pentagon","hexagon","septagon","octagon","doublecircle",
+    "doubleoctagon","tripleoctagon","invtriangle","invtrapezium",
+    "invhouse","Mdiamond","Msquare","Mcircle","rect","rectangle","square",
+    "star","none","underline","cylinder","note","tab","folder","box3d",
+    "component","promoter","cds","terminator","utr","primersite",
+    "restrictionsite","fivepoverhang","threepoverhang","noverhang",
+    "assembly","signature","insulator","ribosite","rnastab","proteasesite",
+    "proteinase","proteinstab","rpromoter","rarrow","larrow","record",
+    "Mrecord"
+  )
+  userProvidedShapes <- df$NodeShape
+  
+  # Determine if user provided node shapes are valid
+  nodeShapeCheck <- tolower(userProvidedShapes) %in% tolower(validNodeShapes)
+  
+  if(all(nodeShapeCheck)){
+    print("All user provided node shapes are valid...")
+  } else{
+    # Replace nonstandard shapes with "box" and warn user
+    userProvidedShapes[!nodeShapeCheck] <- "box"
+    print("One or more invalid node shapes provided in 'NodeShape' column...
+          Replacing invalid shapes with 'box'...")
+  }
+  # From - check if node names provided are also in name column
+  # Perform same normalization applied to 'Name' column
+  df$From <- str_replace_all(df$From, " ", "")
+  df$From <- str_replace_all(df$From, "[^[:alnum:]]", "")
+  
+  uniqueFromNodes <- unique(df$From)
+  fromNodeCheck <- uniqueFromNodes %in% uniqueNodeNames
+  if(!all(fromNodeCheck)){
+    stop("Node names in 'From' column not found in 'Name' column 
+         Check file provided and try again", call. = FALSE)
+  }
+  
+  # To - check if node names provided are also in name column
+  # Perform same normalization applied to 'Name' column
+  df$To <- str_replace_all(df$To, " ", "")
+  df$To <- str_replace_all(df$To, "[^[:alnum:]]", "")
+  
+  uniqueToNodes <- unique(df$To)
+  toNodeCheck <- uniqueToNodes %in% uniqueNodeNames
+  if(!all(toNodeCheck)){
+    stop("Node names in 'To' column not found in 'Name' column 
+         Check file provided and try again", call. = FALSE)
+  }
+  
+  # Create new columns to set the index of each node name, description, color, and shape
+  # Name Index
+  df$NameId <- paste0("@@", seq_len(nrow(df)))
+  
+  # Description Index
+  df$DescId <- paste0("@@", seq_len(nrow(df)))
+  
+  # Color Index - index starts after name/description index
+  df$ColorId <- paste0("@@", (seq_len(nrow(df))+nrow(df)))
+  
+  # Shape Index - index starts after color index
+  df$ShapeId <- paste0("@@", (seq_len(nrow(df))+(nrow(df) * 2)))
+  
+  # Create edge connection descriptions column
+  # FROM -> TO
+  # Determine the graph type provided by the user (or default)
+  if(graphType == "directed"){
+    arrowStyle <- "->"
+  } else{
+    arrowStyle <- "-"
+  }
+  
+  # Create new column - EdgeConnections
+  df$EdgeConnections <- paste0(df$From,arrowStyle,df$To)
+  
+  # Concat a massive string that includes all information needed
+  
+  # Write that string to a .txt file
+  
+  # Write graphic to whichever output option selected by user
+  # HTML
+  # PNG
+  # PDF
+  
 }
