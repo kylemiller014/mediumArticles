@@ -29,8 +29,6 @@ tab6->tab1
 }
 ")
 
-# Read in .csv file and start testing column manipulation required
-
 #### Create function #####
 csvToGrViz <- function(inputFile, # .CSV file required
                        fileDir, # File path for output dir
