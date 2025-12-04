@@ -12,27 +12,21 @@ require(dplyr)
 #### Background/Introduction ####
 # Simple example of grViz functionality
 grViz("digraph {graph [rankdir = LR]
-tab1[label ='@@1', shape = circle, style = filled, fillcolor = gold]
-tab2[label ='@@2', shape = circle, style = filled, fillcolor = silver]
-tab3[label ='@@3', shape = circle, style = filled, fillcolor = bronze]
-tab4[label ='@@4', shape = circle, style = filled, fillcolor = gray90]
-tab5[label ='@@5', shape = circle, style = filled, fillcolor = gray90]
-tab6[label ='@@6', shape = circle, style = filled, fillcolor = gray90]
-tab7[label ='@@7', shape = circle, style = filled, fillcolor = salmon]
+tab1[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab2[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab3[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab4[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab5[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab6[label ='duck', shape = circle, style = filled, fillcolor = gold]
+tab7[label ='GOOSE', shape = circle, style = filled, fillcolor = gray90]
+
 tab1->tab2
 tab2->tab3
 tab3->tab4
 tab4->tab5
 tab5->tab6
-tab6->tab7
+tab6->tab1
 }
-[1]: 'If you ain’t first, you’re last';
-[2]: 'Nothing wrong with silver';
-[3]: 'Third loser';
-[4]: 'Didn’t even manage to podium - what a shame';
-[5]: 'Did you try?';
-[6]: 'Did you die?';
-[7]: 'People are starting to murmur, that you don’t have the balls to do it';
 ")
 
 # Read in .csv file and start testing column manipulation required
