@@ -6,9 +6,34 @@ require(htmlwidgets)
 require(DiagrammeRsvg)
 require(rsvg)
 require(stringr)
+require(tools)
+require(dplyr)
 
 #### Background/Introduction ####
 # Simple example of grViz functionality
+grViz("digraph {graph [rankdir = LR]
+tab1[label ='@@1', shape = circle, style = filled, fillcolor = gold]
+tab2[label ='@@2', shape = circle, style = filled, fillcolor = silver]
+tab3[label ='@@3', shape = circle, style = filled, fillcolor = bronze]
+tab4[label ='@@4', shape = circle, style = filled, fillcolor = gray90]
+tab5[label ='@@5', shape = circle, style = filled, fillcolor = gray90]
+tab6[label ='@@6', shape = circle, style = filled, fillcolor = gray90]
+tab7[label ='@@7', shape = circle, style = filled, fillcolor = salmon]
+tab1->tab2
+tab2->tab3
+tab3->tab4
+tab4->tab5
+tab5->tab6
+tab6->tab7
+}
+[1]: 'If you ain’t first, you’re last';
+[2]: 'Nothing wrong with silver';
+[3]: 'Third loser';
+[4]: 'Didn’t even manage to podium - what a shame';
+[5]: 'Did you try?';
+[6]: 'Did you die?';
+[7]: 'People are starting to murmur, that you don’t have the balls to do it';
+")
 
 # Read in .csv file and start testing column manipulation required
 
@@ -44,12 +69,26 @@ csvToGrViz <- function(inputFile, # .CSV file required
   if(!requireNamespace("stringr", quietly = TRUE)) {
     stop("Install the stringr package - install.packages('stringr')", call. = FALSE)
   }
+  # tools
+  if(!requireNamespace("tools", quietly = TRUE)) {
+    stop("Install the tools package - install.packages('tools')", call. = FALSE)
+  }
+  # dplyr
+  if(!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Install the dplyr package - install.packages('dplyr')", call. = FALSE)
+  }
   #### Initial data validation check for user inputs ####
   # Check the "inputFile" path provided by the user
   # 1) Was a value provided?
   # 2) Does the file path include a .csv file extension
   # 3) Ensure no non-standard characters are provided within the file path that would impact reading a file
-    if(missing(inputFile) || file_ext(as.character(inputFile)) != "csv" || !grepl("^[A-Za-z0-9._\\-/\\\\]+$", as.character(inputFile))){
+  # Regex allows:
+  # allows A–Z, a–z, 0–9
+  # allows spaces
+  # allows . _ - / \
+  # puts - at the end to avoid invalid ranges
+  # handles R's string-escaping correctly
+    if(missing(inputFile) || file_ext(as.character(inputFile)) != "csv" || !grepl("^[A-Za-z0-9._ /\\\\-]+$", as.character(inputFile))){
       stop("File path provided does not point to a .csv file or includes non-standard characters - check the path provided", call. = FALSE)
     }
   
@@ -63,33 +102,33 @@ csvToGrViz <- function(inputFile, # .CSV file required
   # 1) Was a value provided?
   # 2) IS the value a string value and longer than a single character
   # 3) Are there any non-standard characters in the string that could impact writing to a file
-  if(missing(fileName) || as.character(fileName) < 1 || !grepl("^[A-Za-z0-9._\\-/\\\\]+$", as.character(fileName))){
+  if(missing(fileName) || as.character(fileName) < 1 || !grepl("^[A-Za-z0-9._ /\\\\-]+$", as.character(fileName))){
     stop("File name missing, not longer than one character, or includes non-standard characters - check the path provided", call. = FALSE)
   }
   
   # Check the "outputType" field provided by the user
-  if(missing(outputType) || upper(outputType) != "HTML" || upper(outputType)  != "PDF" || upper(outputType)  != "PNG"){
+  if(missing(outputType) || (str_to_upper(outputType) != "HTML" && str_to_upper(outputType)  != "PDF" && str_to_upper(outputType)  != "PNG")){
     # Set outputType to default value - "HTML"
     outputType <- "HTML"
     print("Output type value either missing or not one of three standard options - 'HTML', 'PDF', or 'PNG' ")
     print("Setting outputType to default value 'HTML' ")
   } else{
     # Ensure value is all caps for later use
-    outputType <- upper(outputType)
+    outputType <- str_to_upper(outputType)
   }
   
   # Check the "graphDir" field provided by the user
-  if(missing(graphDir) || upper(as.character(graphDir) != "LR" || upper(as.character(graphDir))!= "RL" 
-                       || upper(as.character(graphDir)) != "TB" || upper(as.character(graphDir)) != "BT")){
+  if(missing(graphDir) || (str_to_upper(as.character(graphDir)) != "LR" && str_to_upper(as.character(graphDir))!= "RL" 
+     && str_to_upper(as.character(graphDir)) != "TB" && str_to_upper(as.character(graphDir)) != "BT")){
     graphDir <- "LR"
     print("Graph direction value either missing or not one of four options - 'LR', 'RL', 'TB', 'BT'")
     print("Setting graphDir value to default value - 'LR'")
   } else{
     # Ensure value is all caps for later use
-    graphDir <- upper(as.character(graphDir))
+    graphDir <- str_to_upper(as.character(graphDir))
   }
   # Check the "graphType" field provided by the user
-  if(missing(graphType) || lower(as.character(graphType)) != "directed" || lower(as.character(graphType)) != "undirected"){
+  if(missing(graphType) || (str_to_lower(as.character(graphType)) != "directed" && str_to_lower(as.character(graphType)) != "undirected")){
     graphType <- "directed"
     print("Graph type value either missing or not one of two options - directed or undirected")
     print("Setting graphType to default value - 'directed'")
@@ -111,7 +150,11 @@ csvToGrViz <- function(inputFile, # .CSV file required
   
   # Following input validation checks - read in .CSV file
   # Read in .csv 
-  df <- read.csv(paste0(dir, inputFile))
+  df <- read.csv(paste0(inputFile))
+  
+  # Remove any columns that were read in as all "NA" on import
+  df <- df %>%
+    select(where(~ !all(is.na(.x))))
   
   # Get a list of column data types to ensure only string values provided
   colDataTypes <- list(sapply(df, class))
@@ -151,7 +194,7 @@ csvToGrViz <- function(inputFile, # .CSV file required
   userProvidedColors <- df$Colors
   
   # Determine if user provided colors are valid
-  colorCheck <- tolower(userProvidedColors) %in% tolower(validColors)
+  colorCheck <- str_to_lower(userProvidedColors) %in% str_to_lower(validColors)
   
   if(all(colorCheck)){
     print("All user provided node colors are valid...")
@@ -179,7 +222,7 @@ csvToGrViz <- function(inputFile, # .CSV file required
   userProvidedShapes <- df$NodeShape
   
   # Determine if user provided node shapes are valid
-  nodeShapeCheck <- tolower(userProvidedShapes) %in% tolower(validNodeShapes)
+  nodeShapeCheck <- str_to_lower(userProvidedShapes) %in% str_to_lower(validNodeShapes)
   
   if(all(nodeShapeCheck)){
     print("All user provided node shapes are valid...")
@@ -194,7 +237,9 @@ csvToGrViz <- function(inputFile, # .CSV file required
   df$From <- str_replace_all(df$From, " ", "")
   df$From <- str_replace_all(df$From, "[^[:alnum:]]", "")
   
-  uniqueFromNodes <- unique(df$From)
+  # Get rid of any blanks
+  fromClean <- df$From[df$From != ""]
+  uniqueFromNodes <- unique(fromClean)
   fromNodeCheck <- uniqueFromNodes %in% uniqueNodeNames
   if(!all(fromNodeCheck)){
     stop("Node names in 'From' column not found in 'Name' column 
@@ -206,25 +251,21 @@ csvToGrViz <- function(inputFile, # .CSV file required
   df$To <- str_replace_all(df$To, " ", "")
   df$To <- str_replace_all(df$To, "[^[:alnum:]]", "")
   
-  uniqueToNodes <- unique(df$To)
+  # Get rid of any blanks
+  toClean <- df$To[df$To != ""]
+  uniqueToNodes <- unique(toClean)
   toNodeCheck <- uniqueToNodes %in% uniqueNodeNames
   if(!all(toNodeCheck)){
     stop("Node names in 'To' column not found in 'Name' column 
          Check file provided and try again", call. = FALSE)
   }
   
-  # Create new columns to set the index of each node name, description, color, and shape
+  # Create new columns to set the index of each node name and description
   # Name Index
   df$NameId <- paste0("@@", seq_len(nrow(df)))
   
   # Description Index
   df$DescId <- paste0("@@", seq_len(nrow(df)))
-  
-  # Color Index - index starts after name/description index
-  df$ColorId <- paste0("@@", (seq_len(nrow(df))+nrow(df)))
-  
-  # Shape Index - index starts after color index
-  df$ShapeId <- paste0("@@", (seq_len(nrow(df))+(nrow(df) * 2)))
   
   # Create edge connection descriptions column
   # FROM -> TO
@@ -238,13 +279,65 @@ csvToGrViz <- function(inputFile, # .CSV file required
   # Create new column - EdgeConnections
   df$EdgeConnections <- paste0(df$From,arrowStyle,df$To)
   
-  # Concat a massive string that includes all information needed
+  # Edge connector df to get rid of undeeded nulls
+  finalEdgeConnections <- df %>%
+    filter(nchar(EdgeConnections) > 4)
   
-  # Write that string to a .txt file
+  # Create new column - NodeBlock
+  df$NodeBlock <- paste0(df$Name,"[label ='", df$DescId, "', shape = ", df$NodeShape, ", style = filled, fillcolor = ", df$Color, "]")
+  
+  # Create new column - attribute block
+  df$Description <- str_replace_all(df$Description, "'", "")
+  
+  # df$AttributeBlock <- paste0("[", seq_len(nrow(df)),"]: df[",seq_len(nrow(df)),", 2];" )
+  df$AttributeBlock <- paste0("[", seq_len(nrow(df)),"]: '",df$Description,"';" )
+  
+  # Concat a massive string that includes all information needed
+  # Initial graph layout
+  initialBlock <- paste0("digraph {",
+                         "graph [rankdir = ", graphDir, "]")
+  writeLines(initialBlock, paste0(fileDir,fileName,".txt"))
+  
+  # Node definiton
+  nodeBlock <- paste(df$NodeBlock)
+  write(nodeBlock, paste0(fileDir,fileName,".txt"), append = TRUE)
+
+  # Edge Connections
+  edgeBlock <- paste(finalEdgeConnections$EdgeConnections)
+  write(edgeBlock, paste0(fileDir,fileName,".txt"), append = TRUE)
+  write("}", paste0(fileDir,fileName,".txt"), append = TRUE)
+  
+  # Create attribute defintion block
+  attributeBlock <- paste(df$AttributeBlock)
+  write(attributeBlock, paste0(fileDir,fileName,".txt"), append = TRUE)
+
+  # Read the text file back into R and feed it to grViz
+  grVizStr <- readLines(paste0(fileDir,fileName,".txt"))
+  staticGraph <- grViz(grVizStr)
   
   # Write graphic to whichever output option selected by user
-  # HTML
-  # PNG
-  # PDF
-  
+  if(outputType == "HTML"){
+    # HTML
+    saveWidget(staticGraph, paste0(fileDir,fileName,".html"), selfcontained = TRUE)
+  } else {
+    svgCode <- export_svg(staticGraph)
+    # PNG
+    if(outputType == "PNG"){
+      rsvg_png(charToRaw(svgCode), file = paste0(fileDir,fileName,".png"), width = 800, height = 600)
+    }else{
+      # PDF
+      rsvg_pdf(charToRaw(svgCode), file = paste0(fileDir,fileName,".pdf"), width = 800, height = 600)
+    }
+  }
+  # Return datas frame to user for debug or tweaks
+  return(df)
 }
+
+wow <- csvToGrViz(inputFile = "/Users/kylemiller/Medium Articles/grViz automation/csvToGrViz.csv",
+                      fileDir = "/Users/kylemiller/Medium Articles/grViz automation/", 
+                      fileName = "sickGraphicDude", 
+                      outputType = "HTML", 
+                      graphDir = "LR", 
+                      graphType = "directed", 
+                      nodeSep = 0.25, 
+                      rankSep = 0.5) 
