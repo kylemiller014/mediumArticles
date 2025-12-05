@@ -37,8 +37,11 @@ csvToGrViz <- function(inputFile, # .CSV file required
                        graphDir = "LR", # one of four options - 'LR', 'RL', 'TB', 'BT'"
                        graphType = "directed", # Either directed or undirected 
                        nodeSep = 0.25, # Define the separation between each node [0.02, 5.0]
-                       rankSep = 0.5 # Defines the separation between each rank [0.02, 5.0]
-                       ) 
+                       rankSep = 0.5, # Defines the separation between each rank [0.02, 5.0]
+                       fontName = "Helvetica", # Defines the font format used for node labels
+                       fontSize = 20, # Defines the font size used for node labels
+                       strWrapLen = 15 # Defines the length of a label before string wrapping is applied
+                         ) 
   {
   #### Check if the user's environment has the required packages installed and available ####
   # DiagrammeR
@@ -134,10 +137,32 @@ csvToGrViz <- function(inputFile, # .CSV file required
   }
   
   # Check the "rankSep" field provided by the user
-  if(missing(rankSep) || !is.numeric(rankSep) || as.double(rankSep) < 0.02 || as.double(rankSep > 5.0)){
+  if(missing(rankSep) || !is.numeric(rankSep) || as.double(rankSep) < 0.02 || as.double(rankSep) > 5.0){
     rankSep <- 0.5
     print("Rank seperation value either missing or is not a numeric value between 0.02 and 5.0")
     print("Setting rankSep to the default value - 0.5")
+  }
+  
+  # Check the "fontName" field provided by the user
+  # Limited list of known valid fonts
+  commonFonts <- c("times-roman",  "helvetica",  "helvetica bold", "courier",  "courier bold", "arial", "arial bold")
+  if(missing(fontName) || !(str_to_lower(fontName) %in% commonFonts)){
+    print("WARNING: Font Name value either missing or is not a common font type...")
+    print("Ensure valid font name is provided")
+  }
+  
+  # Check the "fontSize" field provided by the user
+  if(missing(fontSize) || !is.numeric(fontSize) || as.double(fontSize) < 5 || as.double(fontSize) > 64){
+    fontSize <- 20
+    print("Font Size value either missing or is not a numeric value between 5 and 64")
+    print("Setting rankSep to the default value - 0.5")
+  }
+  
+  # Check "strWrapLen" filed provided by the user
+  if(missing(strWrapLen) || !is.numeric(strWrapLen) || as.double(strWrapLen) < 5 || as.double(strWrapLen) > 64){
+    strWrapLen <- 15
+    print("String Wrap Length value either missing or is not a numeric value between 5 and 64")
+    print("Setting strWrapLen to the default value - 15")
   }
   
   # Following input validation checks - read in .CSV file
@@ -183,7 +208,7 @@ csvToGrViz <- function(inputFile, # .CSV file required
   # If yes - replace with standard color and warn user
   # List of all available colors for use
   validColors <- colors()
-  userProvidedColors <- df$Colors
+  userProvidedColors <- df$Color
   
   # Determine if user provided colors are valid
   colorCheck <- str_to_lower(userProvidedColors) %in% str_to_lower(validColors)
@@ -275,19 +300,27 @@ csvToGrViz <- function(inputFile, # .CSV file required
   finalEdgeConnections <- df %>%
     filter(nchar(EdgeConnections) > 4)
   
+  # Create new column - userCleanedColors
+  df$CleanedColors <- userProvidedColors
+  
   # Create new column - NodeBlock
-  df$NodeBlock <- paste0(df$Name,"[label ='", df$DescId, "', shape = ", df$NodeShape, ", style = filled, fillcolor = ", df$Color, "]")
+  df$NodeBlock <- paste0(df$Name,"[label ='", df$DescId, "', shape = ", df$NodeShape, ", style = filled, fillcolor = ", df$CleanedColors, "]")
   
   # Create new column - attribute block
   df$Description <- str_replace_all(df$Description, "'", "")
   
-  # df$AttributeBlock <- paste0("[", seq_len(nrow(df)),"]: df[",seq_len(nrow(df)),", 2];" )
-  df$AttributeBlock <- paste0("[", seq_len(nrow(df)),"]: '",df$Description,"';" )
+  # Add str_wrap() for ~aesthetics~ (optional step but makes it better imo)
+  # Round strWrapLen provided
+  strWrapLen <- round(strWrapLen)
+  df$AttributeBlock <- paste0("[", seq_len(nrow(df)),"]: str_wrap('",df$Description,"', ", strWrapLen, ");" )
   
   # Concat a massive string that includes all information needed
   # Initial graph layout
+  # Round font size  provided
+  fontSize <- round(fontSize)
   initialBlock <- paste0("digraph {",
-                         "graph [rankdir = ", graphDir, "]")
+                         "graph [rankdir = ", graphDir," ,nodesep = ",nodeSep," ,ranksep = ", rankSep, "]",
+                         "node[fontname = ", fontName ," ,fontsize = ", fontSize, "]")
   writeLines(initialBlock, paste0(fileDir,fileName,".txt"))
   
   # Node definiton
@@ -321,15 +354,46 @@ csvToGrViz <- function(inputFile, # .CSV file required
       rsvg_pdf(charToRaw(svgCode), file = paste0(fileDir,fileName,".pdf"), width = 800, height = 600)
     }
   }
-  # Return datas frame to user for debug or tweaks
+  # Return data frame to user for debug or tweaks
   return(df)
 }
 
-wow <- csvToGrViz(inputFile = "/Users/kylemiller/Medium Articles/grViz automation/csvToGrViz.csv",
+# Does it actually work...
+# Provide all valid values
+genericTest <- csvToGrViz(inputFile = "/Users/kylemiller/Medium Articles/grViz automation/csvToGrViz.csv",
                       fileDir = "/Users/kylemiller/Medium Articles/grViz automation/", 
-                      fileName = "sickGraphicDude", 
+                      fileName = "genericTest", 
                       outputType = "HTML", 
                       graphDir = "LR", 
                       graphType = "directed", 
                       nodeSep = 0.25, 
-                      rankSep = 0.5) 
+                      rankSep = 0.5,
+                      fontName = "Helvetica",
+                      fontSize = 20,
+                      strWrapLen = 15) 
+
+# Provide all invalid values
+whenTheUserCantRead <- csvToGrViz(inputFile = "/Users/kylemiller/Medium Articles/grViz automation/csvToGrViz.csv",
+                          fileDir = "/Users/kylemiller/Medium Articles/grViz automation/", 
+                          fileName = "readingComprehension", 
+                          outputType = "CHATGPT", 
+                          graphDir = "PAPER", 
+                          graphType = "COOL", 
+                          nodeSep = 100, 
+                          rankSep = 985,
+                          fontName = "RickJames",
+                          fontSize = 200,
+                          strWrapLen = 150) 
+
+# Mess with the CSV file
+whenTheCsvCantRead <- csvToGrViz(inputFile = "/Users/kylemiller/Medium Articles/grViz automation/csvToGrViz_weird.csv",
+                          fileDir = "/Users/kylemiller/Medium Articles/grViz automation/", 
+                          fileName = "weridCsvGoodResult", 
+                          outputType = "HTML", 
+                          graphDir = "LR", 
+                          graphType = "directed", 
+                          nodeSep = 0.25, 
+                          rankSep = 0.5,
+                          fontName = "Helvetica",
+                          fontSize = 20,
+                          strWrapLen = 15) 
