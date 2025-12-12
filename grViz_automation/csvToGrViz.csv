@@ -1,0 +1,8 @@
+Name,Description,Color,Node_Shape,From,To,
+tab1,"If you ain’t first, you’re last",gold,circle,tab1,tab2,
+tab2,Nothing wrong with silver,silver, circle,tab2,tab3,
+tab3,Third loser,bronze, circle,tab3,tab4,
+tab4,Didn’t even manage to podium - what a shame,gray90, circle,tab4,tab5,
+tab5,Did you try?,gray90, circle,tab5,tab6,
+tab6,Did you die?,gray90, circle,tab6,tab7,
+tab7,"People are starting to murmur, that you don’t have the balls to do it",salmon, circle,,,
